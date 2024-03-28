@@ -395,7 +395,7 @@ da_nb <- function(y, d){
 run_orm <- function(counts, meta, fm = ~ group, norm = 'TSS'){
   m <- t(counts)
   meta2 <- meta %>%
-    mutate(#sex = as.numeric(meta$sex),
+    mutate(sex = as.numeric(meta$sex),
            group = ifelse(meta$group == 'control', 0, 1))
   mf <- meta2 %>% select(all.vars(fm)) %>% as.matrix
 
@@ -496,7 +496,7 @@ resl <- list()
 Sys.time()
 for(k in 1:length(funs)){
   rs <- NULL
-  try(rs <- furrr::future_map2(lcounts, lmeta, funs[[k]],
+  try(rs <- furrr::future_pmap(list(lcounts, lmeta, lfm), funs[[k]],
                                .options = furrr::furrr_options(seed = 1),
                                .progress = T))
   
