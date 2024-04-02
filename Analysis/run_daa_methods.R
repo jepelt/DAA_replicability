@@ -11,8 +11,8 @@ make_physeq <- function(counts, meta){
 #ALDEx2-------------------------------------------------------------------------
 run_aldex <- function(counts, meta, fm = ~ group, glm = T){
   if(!glm){
-    obj <- ALDEx2::aldex(reads = t(counts), conditions = meta$group,
-                         verbose = F)
+    conds <- as.character(meta$group)
+    obj <- ALDEx2::aldex(reads = t(counts), conditions = conds, verbose = F)
 
     res <- obj %>%
       rownames_to_column('taxon') %>%
@@ -477,7 +477,6 @@ funs <- list(
   ~ run_fastancom(.x, .y),
   ~ run_limma(.x, .y),
   ~ run_linda(.x, .y),
-  ~ run_linda(.x, .y, zeroh = 'Pseudo'),
   #~ run_logr_firth(.x, .y), see comments on da_logr_firth function
   ~ run_mgs(.x, .y),
   ~ run_nb(.x, .y),

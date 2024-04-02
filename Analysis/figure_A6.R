@@ -44,7 +44,7 @@ res_abs <- bind_rows(bind_rows(res_list)) %>%
              'LDM (TSS)',
              'limma-voom (RLE)', 'limma-voom (TMM)',  'limma-voom (TMMwsp)',
              'LinDA (Bias corr.)',
-             'LogR',
+             #'LogR', #Uncomment if LogR is run
              'MaAsLin2-AST (TSS)', 'MaAsLin2 (CSS)', 'MaAsLin2 (TMM)',
              'MaAsLin2 (TSS)', 'MaAsLin2 (CLR)',
              'metagenomeSeq (CSS)', 'metagenomeSeq (GMPR)',

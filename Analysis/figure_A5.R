@@ -17,8 +17,6 @@ load('res_covariates.rds')
 load('data_meta_041023.rds')
 load('data_prevl_061023.rds')
 
-t <- res_all %>% distinct(method)
-
 res_all <- bind_rows(res_list) %>% 
   left_join(., d_meta, by = 'data_id') %>% 
   left_join(., d_prevl, by = c('data_id', 'taxon')) %>% 
@@ -33,7 +31,7 @@ res_all <- bind_rows(res_list) %>%
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG)',
+                  'MaAsLin2 (LOG, TSS)',
                   'mSeq (CSS)',
                   'ORMW (Score, TSS)')] %>% 
   .[, method := ifelse(method == 'mSeq (CSS)', 'metagenomeSeq', method)] %>% 

@@ -1,5 +1,7 @@
 library(tidyverse)
 
+## The raw datasets can be downloaded from https://zenodo.org/records/840333 ##
+
 #Read in and filter datasets----------------------------------------------------
 studies <- tibble(folder = list.files(path = 'Data/Duvallet')) %>% 
   filter(str_detect(folder, 'results') & !str_detect(folder, 'tar\\.gz')) %>% 

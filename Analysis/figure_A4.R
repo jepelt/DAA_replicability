@@ -31,11 +31,11 @@ res_all <- bind_rows(res_list) %>%
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG)',
+                  'MaAsLin2 (LOG, TSS)',
                   'mSeq (CSS)',
-                  'ORM (Score, TSS)')] %>% 
+                  'ORMW (Score, TSS)')] %>% 
   .[, method := ifelse(method == 'mSeq (CSS)', 'metagenomeSeq', method)] %>% 
-  .[, method := ifelse(method == 'ORM (Score, TSS)', 'ORM/Wilcox', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, TSS)', 'ORM/Wilcox', method)] %>% 
   .[, method := tstrsplit(method, " ", fixed = T, keep = 1)] %>% 
   .[, analysis := tstrsplit(data_id, " ", fixed = T, keep = 1)] %>% 
   .[, q := p.adjust(p, method = 'BH'),

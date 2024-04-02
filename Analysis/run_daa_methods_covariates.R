@@ -11,8 +11,8 @@ make_physeq <- function(counts, meta){
 #ALDEx2-------------------------------------------------------------------------
 run_aldex <- function(counts, meta, fm = ~ group, glm = T){
   if(!glm){
-    obj <- ALDEx2::aldex(reads = t(counts), conditions = meta$group,
-                         verbose = F)
+    conds <- as.character(meta$group)
+    obj <- ALDEx2::aldex(reads = t(counts), conditions = conds, verbose = F)
 
     res <- obj %>%
       rownames_to_column('taxon') %>%
@@ -488,7 +488,7 @@ funs <- list(
   ~ run_fastancom(..1, ..2, ..3),
   ~ run_limma(..1, ..2, ..3),
   ~ run_linda(..1, ..2, ..3),
-  #~ run_logr_firth(..1, ..2, ..3), #see commnets on da_logr_firth function
+  #~ run_logr_firth(..1, ..2, ..3), #See the comments on da_logr_firth function
   ~ run_orm(..1, ..2, ..3)
 )
 
@@ -511,9 +511,10 @@ res_ldm <- res_maaslin <- list()
 for(i in 1:length(datasets)){
   counts <- lcounts[[i]]
   meta <- lmeta[[i]]
+  fm <- lfm[[i]]
   
   res_ldm[[i]] <- run_ldm(counts, meta, fm)
-  res_maaslin2[[i]] <- run_maaslin2(counts, meta, fm)
+  res_maaslin[[i]] <- run_maaslin2(counts, meta, fm)
 }
 
 res_list <- c(resl, res_ldm, res_maaslin)

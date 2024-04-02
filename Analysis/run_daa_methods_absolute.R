@@ -11,8 +11,8 @@ make_physeq <- function(counts, meta){
 #ALDEx2-------------------------------------------------------------------------
 run_aldex <- function(counts, meta, fm = ~ group, glm = T){
   if(!glm){
-    obj <- ALDEx2::aldex(reads = t(counts), conditions = meta$group,
-                         verbose = F)
+    conds <- as.character(meta$group)
+    obj <- ALDEx2::aldex(reads = t(counts), conditions = conds, verbose = F)
 
     res <- obj %>%
       rownames_to_column('taxon') %>%
@@ -465,7 +465,7 @@ lmeta <- map(datasets, ~ .$meta)
 
 funs <- list(
    ~ run_aldex(.x, .y, glm = T),
-   ~ run_ancombc2(.x, .y),
+   ~ run_ancombc2(.x, .y), #Not able to run on Vieira-Silva data
    ~ run_corncob(.x, .y, ev = F),
    ~ run_corncob(.x, .y, ev = T),
    ~ run_deseq(.x, .y, norm = 'Default'),
