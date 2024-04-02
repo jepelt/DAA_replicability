@@ -680,8 +680,3 @@ for(i in 1:length(whole_studies)){
 }
 
 save(data_whole, file = 'data_16s_whole_031023.rds')
-
-
-#-------------------------------------------------------------------------------
-t1 <- data_half[[1]]$meta
-t2 <- data_half[[1]]$counts
