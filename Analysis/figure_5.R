@@ -133,7 +133,6 @@ dtb_s2 <- bind_rows(dtb_s, dss) %>%
   mutate(std = std01(value),
          std = ifelse(is.na(std), 0, std),
          disease = ifelse(disease == 'adenoma', 'Ade', disease),
-         disease = ifelse(disease == 'NASH', 'NAS', disease),
          type = ifelse(type == 'Shotgun', 'SG', type),
          xc = tolower(paste(method, var))) %>% 
   ungroup() %>% 

@@ -123,6 +123,7 @@ dtb_h2 <- bind_rows(dtb_h, dsh) %>%
          disease = ifelse(disease == 'adenoma', 'Ade.', disease),
          disease = ifelse(disease == 'NASH', 'NAS', disease),
          disease = ifelse(disease == 'cirrhosis', 'Cirr.', disease),
+         disease = ifelse(disease == 'CIRR', 'Cirr.', disease),
          disease = ifelse(disease == 'parkinson', 'PD', disease),
          disease = ifelse(disease == 'diarrhea', 'Diarr.', disease),
          disease = ifelse(disease == 'parkinson', 'PD', disease),
