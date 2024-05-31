@@ -36,8 +36,8 @@ res_all <- bind_rows(res_list) %>%
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG, TSS)',
-                  'MaAsLin2 (AST, TSS)',
+                  'MaAsLin2 (LOG)',
+                  'MaAsLin2 (AST)',
                   'MaAsLin2 (LOG, CSS)',
                   'MaAsLin2 (LOG, TMM)',
                   'MaAsLin2 (NONE, CLR)',
@@ -53,7 +53,7 @@ res_all <- bind_rows(res_list) %>%
   .[, method := ifelse(method == 'corncob (LRT, ev = FALSE)', 'corncob-UEV', method)] %>% 
   .[, method := ifelse(method == 'DESeq2 (LRT, Default)', 'DESeq2-LRT', method)] %>% 
   .[, method := ifelse(method == 'LDM (CLR = TRUE)', 'LDM-CLR', method)] %>% 
-  .[, method := ifelse(method == 'MaAsLin2 (AST, TSS)', 'MaAsLin2-AST', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (AST)', 'MaAsLin2-AST', method)] %>% 
   .[, method := ifelse(method == 'MaAsLin2 (LOG, CSS)', 'MaAsLin2-CSS', method)] %>% 
   .[, method := ifelse(method == 'MaAsLin2 (LOG, TMM)', 'MaAsLin2-TMM', method)] %>% 
   .[, method := ifelse(method == 'MaAsLin2 (NONE, CLR)', 'MaAsLin2-CLR', method)] %>% 

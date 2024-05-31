@@ -13,7 +13,7 @@ date <- format(Sys.Date(), "%d%m%y")
 
 
 #Load files and prepare tibble of results---------------------------------------
-load('res_covariates.rds')
+load('res_main.rds')
 load('data_meta_041023.rds')
 load('data_prevl_061023.rds')
 
@@ -22,26 +22,51 @@ res_all <- bind_rows(res_list) %>%
   left_join(., d_prevl, by = c('data_id', 'taxon')) %>% 
   as.data.table() %>% 
   .[method %in% c('ALDEx2 (glm)',
+                  'ALDEx2 (t-test0.5)',
+                  'ALDEx2 (Wilcoxon)',
                   'ANCOM-BC2 (pc = 0)',
                   'corncob (LRT, ev = TRUE)',
+                  'corncob (LRT, ev = FALSE)',
                   'DESeq2 (Wald, Default)',
+                  'DESeq2 (LRT, Default)',
                   'edgeR (QL, TMM)',
                   'fastANCOM (0.5, 0.05, 0.05)',
                   'LDM (CLR = FALSE)',
+                  'LDM (CLR = TRUE)',
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG, TSS)',
+                  'MaAsLin2 (LOG)',
+                  'MaAsLin2 (AST)',
+                  'MaAsLin2 (LOG, CSS)',
+                  'MaAsLin2 (LOG, TMM)',
+                  'MaAsLin2 (NONE, CLR)',
                   'mSeq (CSS)',
+                  'NB',
                   'ORMW (Score, TSS)',
+                  'ORMW (Score, GMPR)',
+                  'ORMW (Score, Wrench)',
+                  'radEmu (Wald)',
                   'ZicoSeq (Default)')] %>% 
+  .[, method := ifelse(method == 'ALDEx2 (Wilcoxon)', 'ALDEx2-Wilcox', method)] %>% 
+  .[, method := ifelse(method == 'ALDEx2 (t-test0.5)', 'ALDEx2-scale', method)] %>% 
+  .[, method := ifelse(method == 'corncob (LRT, ev = FALSE)', 'corncob-UEV', method)] %>% 
+  .[, method := ifelse(method == 'DESeq2 (LRT, Default)', 'DESeq2-LRT', method)] %>% 
+  .[, method := ifelse(method == 'LDM (CLR = TRUE)', 'LDM-CLR', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (AST)', 'MaAsLin2-AST', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (LOG, CSS)', 'MaAsLin2-CSS', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (LOG, TMM)', 'MaAsLin2-TMM', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (NONE, CLR)', 'MaAsLin2-CLR', method)] %>% 
+  .[, method := ifelse(method == 'NB', 'NegBin', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, TSS)', 'ORM/W', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, GMPR)', 'ORM/W-GMPR', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, Wrench)', 'ORM/W-Wrench', method)] %>% 
   .[, method := ifelse(method == 'mSeq (CSS)', 'metagenomeSeq', method)] %>% 
-  .[, method := ifelse(method == 'ORMW (Score, TSS)', 'ORM/Wilcox', method)] %>% 
   .[, method := tstrsplit(method, " ", fixed = T, keep = 1)] %>% 
   .[, analysis := tstrsplit(data_id, " ", fixed = T, keep = 1)] %>% 
   .[, q := p.adjust(p, method = 'BH'),
     by = c('data_id', 'method')] %>% 
-  .[, q := ifelse(grepl('DESeq2|LDM', method, perl = T), 
+  .[, q := ifelse(grepl('DESeq2|LDM|Zico', method, perl = T), 
                   p_fdr, q)] %>%
   .[, t91.7 := qt(.834 + (1 - .834) / 2, df = df)] %>% 
   .[, lwr := ifelse(is.na(lwr), est - t91.7 * se, lwr)] %>% 
@@ -117,7 +142,7 @@ res_h <- olh %>%
          method_nh = fct_reorder(method, nhit))
 
 
-#Create Figure A5---------------------------------------------------------------
+#Create Figure A2.1-------------------------------------------------------------
 title_size <- 12
 axis_title_size <- 10
 axis_text_size <- 8
@@ -132,9 +157,9 @@ acc_lvl <- sgn_level1 * sgn_level2 * 50
               vjust = .4, hjust = 1, alpha = 1,
               color = 'black', fontface = 'bold', size = 2.7) +
     coord_flip() +
-    scale_y_reverse(expand = c(0, 0), limits = c(19.5, 0),
-                    breaks = seq(0, 20, 2),
-                    labels = paste0(seq(0, 20, 2), '%')) +
+    scale_y_reverse(expand = c(0, 0), limits = c(9, 0),
+                    breaks = seq(0, 10, 2),
+                    labels = paste0(seq(0, 10, 2), '%')) +
     labs(y = 'Percentage of conflicting results (Conflict%)') +
     theme_minimal() +
     theme(axis.title.y = element_blank(),
@@ -180,9 +205,9 @@ acc_lvl <- sgn_level1 * sgn_level2 * 50
     geom_hline(yintercept = sgn_level1 * 50, linewidth = 1, linetype = '21',
                color = '#E03E18') +
     coord_flip() +
-    scale_y_reverse(expand = c(0, 0), breaks = seq(0, 50, 5),
-                    labels = paste0(seq(0, 50, 5), '%'),
-                    limits = c(49, 0)) +
+    scale_y_reverse(expand = c(0, 0), breaks = seq(0, 30, 5),
+                    labels = paste0(seq(0, 30, 5), '%'),
+                    limits = c(31, 0)) +
     labs(y = 'Percentage of opposite estimates (Opposite%)') +
     theme_minimal() +
     theme(axis.title.y = element_blank(),
@@ -243,7 +268,7 @@ acc_lvl <- sgn_level1 * sgn_level2 * 50
 )
 
 pmainh <- ggplot(tibble(x = 0:1)) +
-  labs(title = paste0('Figure A5: Results of the split-data analyses with covariates')) +
+  labs(title = paste0('Figure A2.1: Results of the split-data analyses')) +
   theme_void() +
   theme(plot.title = element_text(hjust = 0, face = 'bold', size = title_size))
 
@@ -262,6 +287,6 @@ psensh <- ggarr(pnhh, ncol = 1, labels = 'e)',
 (ph <- ggarr(pmainh, pmajorh, pblank, pminorh, pblank, psensh, nrow = 6,
              heights = c(.1, .6, .05, .4, .05, .4)))
 
-ggsave(filename = paste0('fig_A5_', date,'.png'),
-       plot = ph, width = 170, height = 180, dpi = 300, unit = 'mm',
+ggsave(filename = paste0('fig_A2.1_', date,'.png'),
+       plot = ph, width = 170, height = 240, dpi = 300, unit = 'mm',
        bg = 'white')

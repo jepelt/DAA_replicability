@@ -31,7 +31,7 @@ res_all <- bind_rows(res_list) %>%
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG, TSS)',
+                  'MaAsLin2 (LOG)',
                   'mSeq (CSS)',
                   'ORMW (Score, TSS)',
                   'ZicoSeq (Default)')] %>% 

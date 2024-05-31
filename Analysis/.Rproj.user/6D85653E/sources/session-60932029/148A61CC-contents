@@ -36,8 +36,8 @@ res_all <- bind_rows(res_list) %>%
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG, TSS)',
-                  'MaAsLin2 (AST, TSS)',
+                  'MaAsLin2 (LOG)',
+                  'MaAsLin2 (AST)',
                   'MaAsLin2 (LOG, CSS)',
                   'MaAsLin2 (LOG, TMM)',
                   'MaAsLin2 (NONE, CLR)',
@@ -53,7 +53,7 @@ res_all <- bind_rows(res_list) %>%
   .[, method := ifelse(method == 'corncob (LRT, ev = FALSE)', 'corncob-UEV', method)] %>% 
   .[, method := ifelse(method == 'DESeq2 (LRT, Default)', 'DESeq2-LRT', method)] %>% 
   .[, method := ifelse(method == 'LDM (CLR = TRUE)', 'LDM-CLR', method)] %>% 
-  .[, method := ifelse(method == 'MaAsLin2 (AST, TSS)', 'MaAsLin2-AST', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (AST)', 'MaAsLin2-AST', method)] %>% 
   .[, method := ifelse(method == 'MaAsLin2 (LOG, CSS)', 'MaAsLin2-CSS', method)] %>% 
   .[, method := ifelse(method == 'MaAsLin2 (LOG, TMM)', 'MaAsLin2-TMM', method)] %>% 
   .[, method := ifelse(method == 'MaAsLin2 (NONE, CLR)', 'MaAsLin2-CLR', method)] %>% 
@@ -76,27 +76,32 @@ res_all <- bind_rows(res_list) %>%
 
 
 #Calculate number of conflicting and replicated results-------------------------
-sgn_level1 <- sgn_level2 <- .05
+sgn_level1s <- sgn_level2s <- .05
 
-ol1h <- res_all %>% 
-  filter(analysis == 'half' & half == 1) %>% 
-  select(method, type, study, iter, taxon,
+ol1s <- res_all %>% 
+  filter(analysis == 'whole' & n_case >= 10 & n_control >= 10 & 
+           disease != 'HIV') %>% 
+  mutate(n1 = n + avg_ls / 10 ^ 10) %>% 
+  select(method, type, disease, taxon, study1 = study, n1,
          pco1 = prevl_control, pca1 = prevl_case,
          est1 = est, q, lwr1 = lwr, upr1 = upr)
 
-ol2h <- res_all %>% 
-  filter(analysis == 'half' & half == 2) %>% 
-  mutate(is2 = T) %>% 
-  select(method, type, study, iter, taxon, is2,
+ol2s <- res_all %>% 
+  filter(analysis == 'whole' & n_case >= 10 & n_control >= 10 & 
+           disease != 'HIV') %>% 
+  mutate(is2 = T,
+         n2 = n + avg_ls / 10 ^ 10) %>% 
+  select(type, disease, taxon, method, study2 = study, n2, is2,
          pco2 = prevl_control, pca2 = prevl_case,
          est2 = est, p, lwr2 = lwr, upr2 = upr)
 
-olh <- left_join(ol1h, ol2h, by = c('method', 'study', 'iter', 'taxon')) %>% 
-  filter(q < sgn_level1 & !is.na(is2)) %>% 
-  mutate(sgn1 = q < sgn_level1,
+ols <- left_join(ol1s, ol2s, 
+                 by = join_by(method, type, disease, taxon, n1 < n2)) %>% 
+  filter(q < sgn_level1s & !is.na(is2)) %>% 
+  mutate(sgn1 = q < sgn_level1s,
          d1 = ifelse(is.na(est1) | is.nan(est1), 0, sign(round(est1, 8))),
          s1 = if_else(sgn1 & d1 != 0, T, F, F),
-         sgn2 = p < sgn_level2,
+         sgn2 = p < sgn_level2s,
          d2 = ifelse(is.na(est2) | is.nan(est2), 0, sign(round(est2, 8))),
          s2 = if_else(sgn2 & d2 != 0, T, F, F),
          nores = d2 == 0,
@@ -110,102 +115,97 @@ olh <- left_join(ol1h, ol2h, by = c('method', 'study', 'iter', 'taxon')) %>%
          cvg = ifelse(is_ci, cvg, NA)) %>%
   mutate_if(is.logical, as.numeric) %>% 
   mutate(check = repl + same + opposite + anti + nores) %>%
-  select(method, study, iter, taxon,
+  select(method, type, disease, study1, study2, taxon,
          est1, q, est2, p, sgn1, d1, s1, sgn2, d2, s2,
-         repl, same, opposite, anti, nores, is_ci, cvg, check)
+         repl, same, opposite, anti, nores, is_ci, cvg, check) %>% 
+  filter(!(str_detect(study1, 'Thomas') & str_detect(study2, 'Thomas')))
 
-stopifnot(sum(olh$check != 1) == 0)
-
+stopifnot(sum(ols$check != 1) == 0)
 
 datasets <- res_all %>% 
   distinct(study, .keep_all = T) %>% 
   select(study, type, disease, n, mean_count)
 
-dtb_h <- olh %>% 
-  group_by(method, study, taxon) %>% 
-  summarize_at(vars(repl, anti), ~ sum(., na.rm = T)) %>% 
+valids <- left_join(ol1s, ol2s, 
+                    by = join_by(method, type, disease, taxon, n1 < n2)) %>% 
+  filter(q < .99 & !is.na(study2)) %>% 
+  filter(!(str_detect(study1, 'Thomas') & str_detect(study2, 'Thomas'))) %>% 
+  distinct(study1, study2) %>%
+  group_by(study1) %>% 
+  summarize(nvalid = n())
+
+dtb_s <- ols %>% 
+  group_by(method, study1, type, disease, taxon) %>% 
+  summarize_at(vars(repl, anti, sgn1), ~ sum(., na.rm = T)) %>% 
   ungroup() %>% 
-  group_by(method, study) %>% 
+  group_by(method, study1) %>% 
   summarize_at(vars(repl, anti), ~ sum(. > 0.5)) %>% 
-  left_join(ol1h %>% distinct(study), ., 'study') %>% 
+  left_join(valids, ., 'study1') %>% 
   mutate(method = ifelse(is.na(method), 'ALDEx2', method)) %>% 
   pivot_wider(names_from = method, values_from = c(anti, repl)) %>% 
-  pivot_longer(cols = -study) %>% 
-  left_join(., datasets, 'study') %>% 
+  pivot_longer(cols = -c(study1, nvalid)) %>% 
+  left_join(., datasets %>% rename(study1 = study), 'study1') %>% 
   mutate(value = ifelse(is.na(value), 0, value)) %>% 
   separate(name , into = c('var', 'method'), sep = '_') %>% 
   mutate(last = 0)
 
-dsh <- dtb_h %>% 
+dss <- dtb_s %>% 
   group_by(method, var) %>% 
   summarize(value = sum(value)) %>% 
-  mutate(last = 1, type = '', n = NULL, disease = '', study = 'tot')
+  mutate(last = 1, type = '', n = NULL, disease = '', study1 = 'tot')
 
-dtb_h2 <- bind_rows(dtb_h, dsh) %>% 
-  group_by(study, var) %>% 
+dtb_s2 <- bind_rows(dtb_s, dss) %>% 
+  group_by(study1, var) %>% 
   mutate(std = std01(value),
          std = ifelse(is.na(std), 0, std),
-         n = ceiling(n / 2),
-         disease = ifelse(disease == 'adenoma', 'Ade.', disease),
+         disease = ifelse(disease == 'adenoma', 'Ade', disease),
          disease = ifelse(disease == 'NASH', 'NAS', disease),
-         disease = ifelse(disease == 'cirrhosis', 'Cirr.', disease),
-         disease = ifelse(disease == 'parkinson', 'PD', disease),
-         disease = ifelse(disease == 'diarrhea', 'Diarr.', disease),
-         disease = ifelse(disease == 'parkinson', 'PD', disease),
-         disease = ifelse(disease == 'hypertension', 'HT', disease),
-         disease = ifelse(disease == 'pre-hypertension', 'PHT', disease),
-         disease = ifelse(disease == 'asthma', 'Asth.', disease),
-         disease = ifelse(disease == 'schizophrenia', 'Schiz.', disease),
-         disease = ifelse(disease == 'migraine', 'Migr.', disease),
-         disease = ifelse(disease == 'cephalosporins', 'Ceph.', disease),
-         disease = ifelse(disease == 'ME/CFS', 'ME', disease),
-         disease = ifelse(disease == 'EDD', 'CDI', disease),
          type = ifelse(type == 'Shotgun', 'SG', type),
          xc = tolower(paste(method, var))) %>% 
   ungroup() %>% 
   arrange(-last, desc(type), desc(tolower(disease)), n) %>% 
-  mutate(study = as_factor(study)) %>% 
+  mutate(study = as_factor(study1)) %>% 
   arrange(xc) %>% 
   mutate(xn = dense_rank(xc))
 
 
-#Create Figure A2.2-------------------------------------------------------------
-ns <- dtb_h2 %>% group_by(study) %>% slice(1) %>% pull(n)
-diseases <- dtb_h2 %>% group_by(study) %>% slice(1) %>% pull(disease)
-typs <- dtb_h2 %>% group_by(study) %>% slice(1) %>% pull(type)
-methods <- dtb_h2 %>% distinct(method) %>% arrange(tolower(method)) %>% 
-  pull(method)
-vlines <- tibble(x = .5 + seq(0, 2 * 27, 2), xend = x, y = 0.5, yend = 58.5)
+#Create Figure A2.4-------------------------------------------------------------
+nvalids <- dtb_s2 %>% group_by(study) %>% slice(1) %>% pull(nvalid)
+ns <- dtb_s2 %>% group_by(study) %>% slice(1) %>% pull(n)
+diseases <- dtb_s2 %>% group_by(study) %>% slice(1) %>% pull(disease)
+condn <- paste0(diseases, ' (', nvalids, ')')
+condn <- ifelse(is.na(nvalids), NA, condn)
+typs <- dtb_s2 %>% group_by(study) %>% slice(1) %>% pull(type)
+methods <- dtb_s2 %>% distinct(method) %>% arrange(tolower(method)) %>% pull(method)
+vlines <- tibble(x = .5 + seq(0, 2 * 27, 2), xend = x, y = 0.5, yend = 39.5)
 
-(pdh <- ggplot(dtb_h2, aes(xn, study)) +
+(pds <- ggplot(dtb_s2, aes(xn, study)) +
     geom_tile(aes(alpha = std, fill = var)) +
     geom_text(aes(label = value), size = 1.6, vjust = .4) +
     geom_segment(data = vlines, aes(x = x, xend = xend, y = y, yend = yend),
                  linewidth = .4, color = 'black') +
     geom_hline(yintercept = c(1.55), linewidth = .4) +
-    geom_hline(yintercept = c(34.55), linewidth = .4, linetype = '33') +
-    annotate(geom = 'point', x = 10, y = 60.5, color = 'white') +
-    annotate(geom = 'text', x = -3.5, y = 1:58, vjust = .4, hjust = .5, 
-             color = 'grey20', label = typs, size = 1.6) +
-    annotate(geom = 'text', x = -2.4, y = 1:58, vjust = .4, hjust = 0,
-             color = 'grey20', label = diseases, size = 1.6) +
-    annotate(geom = 'text', x = .3, y = 1:58, vjust = .4, hjust = 1,
-             color = 'grey20', label = ns, size = 1.6) +
-    annotate(geom = 'text', x = c(-4.1, -.2, -2.5), y = 59, vjust = 0,
-             hjust = 0, color = 'grey20', label = c('Seq.', 'N', 'Cond.'),
+    geom_hline(yintercept = c(23.55), linewidth = .4, linetype = '33') +
+    annotate(geom = 'point', x = 10, y = 42.5, color = 'white') +
+    annotate(geom = 'text', x = -3.7, y = 1:39, vjust = .4, hjust = .5, color = 'grey20',
+             label = typs, size = 1.6) +
+    annotate(geom = 'text', x = -2.8, y = 1:39, vjust = .4, hjust = 0, color = 'grey20',
+             label = condn, size = 1.6) +
+    annotate(geom = 'text', x = .3, y = 1:39, vjust = .4, hjust = 1, color = 'grey20',
+             label = ns, size = 1.6) +
+    annotate(geom = 'text', x = c(-4.3, -.2, -2.9), y = 40, vjust = 0, hjust = 0, color = 'grey20',
+             label = c('Seq.', 'N', 'Cond.\n(NValid)'),
              size = 1.6, fontface = 'bold', angle = 0) +
-    annotate(geom = 'text', x = -2.0, y = 1, vjust = 0.4, hjust = 0.5,
-             color = 'grey20', label = 'Total', size = 1.6, fontface = 'bold',
-             angle = 0) +
+    annotate(geom = 'text', x = -2.0, y = 1, vjust = 0.4, hjust = 0.5, color = 'grey20',
+             label = 'Total', size = 1.6, fontface = 'bold', angle = 0) +
     scale_x_continuous(breaks = seq(1.5, 2 * 27 - .5, 2), labels = methods,
                        expand = c(0, 0), limits = c(-4.3, .5 + 2 * 27)) +
     scale_alpha(breaks = seq(0, 1, .25), labels = c('Min', '', '', '', 'Max'),
-                name = 'Value\nrelative\nto other\nmethods',
-                guide = guide_legend(reverse = T)) +
+                name = 'Value\nrelative\nto other\nmethods', guide = guide_legend(reverse = T)) +
     scale_fill_manual(name = 'Result', labels = c('Conflicting', 'Replicated'),
                       values = c("#f7AD19", "#70aed1")) +
-    labs(y = 'Original dataset',
-         title = 'Figure A2.2: Number of conflicting and replicated results on split datasets') +
+    labs(title = 'Figure A2.4: Number of conflicting and replicated results between separate studies',
+         y = 'Exploratory dataset') +
     theme_minimal() +
     theme(axis.title.x = element_blank(),
           axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1,
@@ -220,6 +220,6 @@ vlines <- tibble(x = .5 + seq(0, 2 * 27, 2), xend = x, y = 0.5, yend = 58.5)
           plot.title.position = 'plot')
 )
 
-ggsave(filename = paste0('fig_A2.2_', date,'.png'),
-       plot = pdh, width = 170, height = 180, dpi = 300, unit = 'mm',
+ggsave(filename = paste0('fig_A2.4_', date,'.png'),
+       plot = pds, width = 170, height = 150, dpi = 300, unit = 'mm',
        bg = 'white')

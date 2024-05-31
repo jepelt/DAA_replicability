@@ -22,46 +22,21 @@ res_all <- bind_rows(res_list) %>%
   left_join(., d_prevl, by = c('data_id', 'taxon')) %>% 
   as.data.table() %>% 
   .[method %in% c('ALDEx2 (glm)',
-                  'ALDEx2 (t-test0.5)',
-                  'ALDEx2 (Wilcoxon)',
                   'ANCOM-BC2 (pc = 0)',
                   'corncob (LRT, ev = TRUE)',
-                  'corncob (LRT, ev = FALSE)',
                   'DESeq2 (Wald, Default)',
-                  'DESeq2 (LRT, Default)',
                   'edgeR (QL, TMM)',
                   'fastANCOM (0.5, 0.05, 0.05)',
                   'LDM (CLR = FALSE)',
-                  'LDM (CLR = TRUE)',
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG, TSS)',
-                  'MaAsLin2 (AST, TSS)',
-                  'MaAsLin2 (LOG, CSS)',
-                  'MaAsLin2 (LOG, TMM)',
-                  'MaAsLin2 (NONE, CLR)',
+                  'MaAsLin2 (LOG)',
                   'mSeq (CSS)',
-                  'NB',
-                  'ORMW (Score, TSS)',
-                  'ORMW (Score, GMPR)',
-                  'ORMW (Score, Wrench)',
-                  'radEmu (Wald)',
+                  'ORM (Score, TSS)',
                   'ZicoSeq (Default)')] %>% 
-  .[, method := ifelse(method == 'ALDEx2 (Wilcoxon)', 'ALDEx2-Wilcox', method)] %>% 
-  .[, method := ifelse(method == 'ALDEx2 (t-test0.5)', 'ALDEx2-scale', method)] %>% 
-  .[, method := ifelse(method == 'corncob (LRT, ev = FALSE)', 'corncob-UEV', method)] %>% 
-  .[, method := ifelse(method == 'DESeq2 (LRT, Default)', 'DESeq2-LRT', method)] %>% 
-  .[, method := ifelse(method == 'LDM (CLR = TRUE)', 'LDM-CLR', method)] %>% 
-  .[, method := ifelse(method == 'MaAsLin2 (AST, TSS)', 'MaAsLin2-AST', method)] %>% 
-  .[, method := ifelse(method == 'MaAsLin2 (LOG, CSS)', 'MaAsLin2-CSS', method)] %>% 
-  .[, method := ifelse(method == 'MaAsLin2 (LOG, TMM)', 'MaAsLin2-TMM', method)] %>% 
-  .[, method := ifelse(method == 'MaAsLin2 (NONE, CLR)', 'MaAsLin2-CLR', method)] %>% 
-  .[, method := ifelse(method == 'NB', 'NegBin', method)] %>% 
-  .[, method := ifelse(method == 'ORMW (Score, TSS)', 'ORM/W', method)] %>% 
-  .[, method := ifelse(method == 'ORMW (Score, GMPR)', 'ORM/W-GMPR', method)] %>% 
-  .[, method := ifelse(method == 'ORMW (Score, Wrench)', 'ORM/W-Wrench', method)] %>% 
   .[, method := ifelse(method == 'mSeq (CSS)', 'metagenomeSeq', method)] %>% 
+  .[, method := ifelse(method == 'ORM (Score, TSS)', 'ORM/Wilcox', method)] %>% 
   .[, method := tstrsplit(method, " ", fixed = T, keep = 1)] %>% 
   .[, analysis := tstrsplit(data_id, " ", fixed = T, keep = 1)] %>% 
   .[, q := p.adjust(p, method = 'BH'),
@@ -76,36 +51,33 @@ res_all <- bind_rows(res_list) %>%
 
 
 #Calculate values of the evaluation metrics-------------------------------------
-sgn_level2s <- .05
+sgn_level2 <- .05
 
 ress <- list()
 alphas <- c(.01, .05, .10)
 for(i in 1:length(alphas)){
-  sgn_level1s <- alphas[i]
+  sgn_level1 <- alphas[i]
   
-  ol1s <- res_all %>% 
-    filter(analysis == 'whole' & n_case >= 10 & n_control >= 10 & 
-             disease != 'HIV') %>% 
-    mutate(n1 = n + avg_ls / 10 ^ 10) %>% 
-    select(method, type, disease, taxon, study1 = study, n1,
+  
+  ol1h <- res_all %>% 
+    filter(analysis == 'half' & half == 1) %>% 
+    select(method, type, study, iter, taxon,
            pco1 = prevl_control, pca1 = prevl_case,
            est1 = est, q, lwr1 = lwr, upr1 = upr)
   
-  ol2s <- res_all %>% 
-    filter(analysis == 'whole') %>% 
-    mutate(is2 = T,
-           n2 = n + avg_ls / 10 ^ 10) %>% 
-    select(type, disease, taxon, method, study2 = study, n2, is2,
+  ol2h <- res_all %>% 
+    filter(analysis == 'half' & half == 2) %>% 
+    mutate(is2 = T) %>% 
+    select(method, type, study, iter, taxon, is2,
            pco2 = prevl_control, pca2 = prevl_case,
            est2 = est, p, lwr2 = lwr, upr2 = upr)
   
-  ols <- left_join(ol1s, ol2s, 
-                   by = join_by(method, type, disease, taxon, n1 < n2)) %>% 
-    filter(q < sgn_level1s & !is.na(is2)) %>% 
-    mutate(sgn1 = q < sgn_level1s,
+  olh <- left_join(ol1h, ol2h, by = c('method', 'study', 'iter', 'taxon')) %>% 
+    filter(q < sgn_level1 & !is.na(is2)) %>% 
+    mutate(sgn1 = q < sgn_level1,
            d1 = ifelse(is.na(est1) | is.nan(est1), 0, sign(round(est1, 8))),
            s1 = if_else(sgn1 & d1 != 0, T, F, F),
-           sgn2 = p < sgn_level2s,
+           sgn2 = p < sgn_level2,
            d2 = ifelse(is.na(est2) | is.nan(est2), 0, sign(round(est2, 8))),
            s2 = if_else(sgn2 & d2 != 0, T, F, F),
            nores = d2 == 0,
@@ -119,48 +91,39 @@ for(i in 1:length(alphas)){
            cvg = ifelse(is_ci, cvg, NA)) %>%
     mutate_if(is.logical, as.numeric) %>% 
     mutate(check = repl + same + opposite + anti + nores) %>%
-    select(method, type, disease, study1, study2, taxon,
+    select(method, study, iter, taxon,
            est1, q, est2, p, sgn1, d1, s1, sgn2, d2, s2,
-           repl, same, opposite, anti, nores, is_ci, cvg, check) %>% 
-    filter(!(str_detect(study1, 'Thomas') & str_detect(study2, 'Thomas')))
+           repl, same, opposite, anti, nores, is_ci, cvg, check)
   
-  stopifnot(sum(ols$check != 1) == 0)
+  stopifnot(sum(olh$check != 1) == 0)
   
-  n_studiess <- nrow(ols %>% distinct(study1))
   
-  hits_s <- left_join(ol1s, ol2s, 
-                      by = join_by(method, type, disease, taxon, n1 < n2)) %>% 
-    distinct(method, study1, taxon, .keep_all = T) %>% 
-    filter(q < sgn_level1s) %>% 
+  n_studies <- nrow(olh %>% distinct(study, iter))
+  
+  hits_h <- ol1h %>% 
+    filter(q < sgn_level1) %>% 
     group_by(method) %>% 
     summarize(nhit = n())
   
-  res_s <- ols %>% 
-    group_by(method, study1, taxon) %>% 
-    summarize_at(vars(repl, same, opposite, anti, nores, cvg, is_ci),
-                 ~ sum(., na.rm = T)) %>% 
-    mutate(n = repl + same + opposite + anti + nores,
-           cvg = cvg / is_ci,
-           is_ci = ifelse(is_ci > 0.5, 1, 0)) %>% 
-    mutate_at(vars(repl, same, opposite, anti, nores), ~ . / n) %>% 
+  res_h <- olh %>% 
     group_by(method) %>% 
     summarize_at(vars(repl, same, opposite, anti, nores, cvg, is_ci),
                  ~ sum(., na.rm = T)) %>% 
     ungroup() %>% 
-    left_join(., hits_s, 'method') %>% 
+    left_join(., hits_h, 'method') %>% 
     mutate(n = repl + same + opposite + anti + nores,
            panti = anti / n * 100,
            prepl = repl / n * 100,
            popp = (anti + opposite + .5 * nores) / n * 100,
            pcvg = cvg / is_ci * 100,
-           method_an = fct_reorder(method, -panti),
+           method_an = fct_reorder(method, -(anti +.001) / n),
            method_re = fct_reorder(method, prepl),
            method_op = fct_reorder(method, -popp),
            method_ci = fct_reorder(method, pcvg),
            method_nh = fct_reorder(method, nhit))
   
   
-  res_concl <- res_s %>% select(method, panti, prepl, popp, pcvg, nhit) %>% 
+  res_concl <- res_h %>% select(method, panti, prepl, popp, pcvg, nhit) %>% 
     mutate_at(vars(pcvg), ~ ifelse(. == 0, NA, .)) %>% 
     mutate(across(c(panti, prepl, popp, pcvg, nhit),
                   .fns = list(std = ~ as.numeric(scale(.))))) %>% 
@@ -178,13 +141,13 @@ for(i in 1:length(alphas)){
                         paste0(round2(res, 1), '%'),
                         as.character(res)),
            res = ifelse(str_detect(res, 'NA'), 'N/A', res),
-           alpha = sgn_level1s)
+           alpha = sgn_level1)
   
   ress[[i]] <- res_concl
 }
 
 
-#Create Figure A2.3-------------------------------------------------------------
+#Create Figure A3---------------------------------------------------------------
 res_final <- ress %>% bind_rows %>% 
   group_by(method) %>%
   arrange(method, alpha, var) %>% 
@@ -203,15 +166,15 @@ xt <- expression(paste("Significance level in exploratory datasets (", alpha, ")
     geom_vline(xintercept = c(3.5, 6.5, 9.5, 12.5), color = 'white',
                linewidth = 1) +
     geom_text(aes(label = res), color = 'grey20', size = 2.0, hjust = 0.55) +
-    annotate(geom = 'text', x = 2, y = 29.5, vjust = 1, hjust = .5, color = 'grey0',
+    annotate(geom = 'text', x = 2, y = 16.6, vjust = 1, hjust = .5, color = 'grey0',
              label = 'Percentage of\nconflicting results\n(Conflict%)', size = 2.5) +
-    annotate(geom = 'text', x = 5, y = 29.5, vjust = 1, hjust = .5, color = 'grey0',
+    annotate(geom = 'text', x = 5, y = 16.6, vjust = 1, hjust = .5, color = 'grey0',
              label = 'Replication\npercentage\n(Replication%)', size = 2.5) +
-    annotate(geom = 'text', x = 8, y = 29.5, vjust = 1, hjust = .5, color = 'grey0',
+    annotate(geom = 'text', x = 8, y = 16.6, vjust = 1, hjust = .5, color = 'grey0',
              label = 'Percentage of\nopposite estimates\n(Opposite%)', size = 2.5) +
-    annotate(geom = 'text', x = 11, y = 29.5, vjust = 1, hjust = .5, color = 'grey0',
+    annotate(geom = 'text', x = 11, y = 16.6, vjust = 1, hjust = .5, color = 'grey0',
              label = 'Overlap percentage\nof conf. intervals\n(CI%)', size = 2.5) +
-    annotate(geom = 'text', x = 14, y = 29.5, vjust = 1, hjust = .5, color = 'grey0',
+    annotate(geom = 'text', x = 14, y = 16.6, vjust = 1, hjust = .5, color = 'grey0',
              label = 'Number of\nsignificant taxa\n(NHits)', size = 2.5) +
     annotate(geom = 'text', x = 1:15, y = 0, vjust = 0, hjust = .5, color = 'grey20',
              label = alphas2, size = 2.5) +
@@ -223,7 +186,7 @@ xt <- expression(paste("Significance level in exploratory datasets (", alpha, ")
                          name = 'Standardized\nvalue') +
     scale_x_discrete(expand = c(0, 0)) +
     scale_y_discrete(expand = c(0, 0)) +
-    labs(title = 'Figure A2.3: Results of the separate study analyses', x = xt) +
+    labs(title = 'Figure A3: Results of the split-data analyses', x = xt) +
     theme_minimal() +
     theme(axis.title.x = element_text(size = 10, color = 'grey0'),
           axis.text.x = element_blank(),
@@ -237,6 +200,6 @@ xt <- expression(paste("Significance level in exploratory datasets (", alpha, ")
           plot.title.position = 'plot')
 )
 
-ggsave(filename = paste0('fig_A2.3_', date,'.png'),
-       plot = pc, width = 170, height = 170, dpi = 300, unit = 'mm',
+ggsave(filename = paste0('fig_A3_', date,'.png'),
+       plot = pc, width = 170, height = 100, dpi = 300, unit = 'mm',
        bg = 'white')

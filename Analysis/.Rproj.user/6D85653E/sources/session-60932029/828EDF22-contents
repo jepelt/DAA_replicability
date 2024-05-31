@@ -22,21 +22,46 @@ res_all <- bind_rows(res_list) %>%
   left_join(., d_prevl, by = c('data_id', 'taxon')) %>% 
   as.data.table() %>% 
   .[method %in% c('ALDEx2 (glm)',
+                  'ALDEx2 (t-test0.5)',
+                  'ALDEx2 (Wilcoxon)',
                   'ANCOM-BC2 (pc = 0)',
                   'corncob (LRT, ev = TRUE)',
+                  'corncob (LRT, ev = FALSE)',
                   'DESeq2 (Wald, Default)',
+                  'DESeq2 (LRT, Default)',
                   'edgeR (QL, TMM)',
                   'fastANCOM (0.5, 0.05, 0.05)',
                   'LDM (CLR = FALSE)',
+                  'LDM (CLR = TRUE)',
                   'limma-voom (TMM)',
                   'LinDA (Adaptive, 0.5)',
                   'LogR (Firth)',
-                  'MaAsLin2 (LOG, TSS)',
+                  'MaAsLin2 (LOG)',
+                  'MaAsLin2 (AST)',
+                  'MaAsLin2 (LOG, CSS)',
+                  'MaAsLin2 (LOG, TMM)',
+                  'MaAsLin2 (NONE, CLR)',
                   'mSeq (CSS)',
+                  'NB',
                   'ORMW (Score, TSS)',
+                  'ORMW (Score, GMPR)',
+                  'ORMW (Score, Wrench)',
+                  'radEmu (Wald)',
                   'ZicoSeq (Default)')] %>% 
+  .[, method := ifelse(method == 'ALDEx2 (Wilcoxon)', 'ALDEx2-Wilcox', method)] %>% 
+  .[, method := ifelse(method == 'ALDEx2 (t-test0.5)', 'ALDEx2-scale', method)] %>% 
+  .[, method := ifelse(method == 'corncob (LRT, ev = FALSE)', 'corncob-UEV', method)] %>% 
+  .[, method := ifelse(method == 'DESeq2 (LRT, Default)', 'DESeq2-LRT', method)] %>% 
+  .[, method := ifelse(method == 'LDM (CLR = TRUE)', 'LDM-CLR', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (AST)', 'MaAsLin2-AST', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (LOG, CSS)', 'MaAsLin2-CSS', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (LOG, TMM)', 'MaAsLin2-TMM', method)] %>% 
+  .[, method := ifelse(method == 'MaAsLin2 (NONE, CLR)', 'MaAsLin2-CLR', method)] %>% 
+  .[, method := ifelse(method == 'NB', 'NegBin', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, TSS)', 'ORM/W', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, GMPR)', 'ORM/W-GMPR', method)] %>% 
+  .[, method := ifelse(method == 'ORMW (Score, Wrench)', 'ORM/W-Wrench', method)] %>% 
   .[, method := ifelse(method == 'mSeq (CSS)', 'metagenomeSeq', method)] %>% 
-  .[, method := ifelse(method == 'ORMW (Score, TSS)', 'ORM/Wilcox', method)] %>% 
   .[, method := tstrsplit(method, " ", fixed = T, keep = 1)] %>% 
   .[, analysis := tstrsplit(data_id, " ", fixed = T, keep = 1)] %>% 
   .[, q := p.adjust(p, method = 'BH'),
@@ -122,8 +147,8 @@ dtb_h2 <- bind_rows(dtb_h, dsh) %>%
          std = ifelse(is.na(std), 0, std),
          n = ceiling(n / 2),
          disease = ifelse(disease == 'adenoma', 'Ade.', disease),
+         disease = ifelse(disease == 'NASH', 'NAS', disease),
          disease = ifelse(disease == 'cirrhosis', 'Cirr.', disease),
-         disease = ifelse(disease == 'CIRR', 'Cirr.', disease),
          disease = ifelse(disease == 'parkinson', 'PD', disease),
          disease = ifelse(disease == 'diarrhea', 'Diarr.', disease),
          disease = ifelse(disease == 'parkinson', 'PD', disease),
@@ -144,43 +169,43 @@ dtb_h2 <- bind_rows(dtb_h, dsh) %>%
   mutate(xn = dense_rank(xc))
 
 
-#Create Figure 3----------------------------------------------------------------
+#Create Figure A2.2-------------------------------------------------------------
 ns <- dtb_h2 %>% group_by(study) %>% slice(1) %>% pull(n)
 diseases <- dtb_h2 %>% group_by(study) %>% slice(1) %>% pull(disease)
 typs <- dtb_h2 %>% group_by(study) %>% slice(1) %>% pull(type)
 methods <- dtb_h2 %>% distinct(method) %>% arrange(tolower(method)) %>% 
   pull(method)
-vlines <- tibble(x = .5 + seq(0, 26, 2), xend = x, y = 0.5, yend = 58.5)
+vlines <- tibble(x = .5 + seq(0, 2 * 27, 2), xend = x, y = 0.5, yend = 58.5)
 
 (pdh <- ggplot(dtb_h2, aes(xn, study)) +
     geom_tile(aes(alpha = std, fill = var)) +
-    geom_text(aes(label = value), size = 2.2, vjust = .4) +
+    geom_text(aes(label = value), size = 1.6, vjust = .4) +
     geom_segment(data = vlines, aes(x = x, xend = xend, y = y, yend = yend),
                  linewidth = .4, color = 'black') +
     geom_hline(yintercept = c(1.55), linewidth = .4) +
     geom_hline(yintercept = c(34.55), linewidth = .4, linetype = '33') +
     annotate(geom = 'point', x = 10, y = 60.5, color = 'white') +
     annotate(geom = 'text', x = -3.5, y = 1:58, vjust = .4, hjust = .5, 
-             color = 'grey20', label = typs, size = 2.5) +
+             color = 'grey20', label = typs, size = 1.6) +
     annotate(geom = 'text', x = -2.4, y = 1:58, vjust = .4, hjust = 0,
-             color = 'grey20', label = diseases, size = 2.5) +
+             color = 'grey20', label = diseases, size = 1.6) +
     annotate(geom = 'text', x = .3, y = 1:58, vjust = .4, hjust = 1,
-             color = 'grey20', label = ns, size = 2.5) +
+             color = 'grey20', label = ns, size = 1.6) +
     annotate(geom = 'text', x = c(-4.1, -.2, -2.5), y = 59, vjust = 0,
              hjust = 0, color = 'grey20', label = c('Seq.', 'N', 'Cond.'),
-             size = 2.5, fontface = 'bold', angle = 0) +
+             size = 1.6, fontface = 'bold', angle = 0) +
     annotate(geom = 'text', x = -2.0, y = 1, vjust = 0.4, hjust = 0.5,
-             color = 'grey20', label = 'Total', size = 2.5, fontface = 'bold',
+             color = 'grey20', label = 'Total', size = 1.6, fontface = 'bold',
              angle = 0) +
-    scale_x_continuous(breaks = seq(1.5, 2 * 14 - .5, 2), labels = methods,
-                       expand = c(0, 0), limits = c(-4.3, .5 + 2 * 14)) +
+    scale_x_continuous(breaks = seq(1.5, 2 * 27 - .5, 2), labels = methods,
+                       expand = c(0, 0), limits = c(-4.3, .5 + 2 * 27)) +
     scale_alpha(breaks = seq(0, 1, .25), labels = c('Min', '', '', '', 'Max'),
                 name = 'Value\nrelative\nto other\nmethods',
                 guide = guide_legend(reverse = T)) +
     scale_fill_manual(name = 'Result', labels = c('Conflicting', 'Replicated'),
                       values = c("#f7AD19", "#70aed1")) +
     labs(y = 'Original dataset',
-         title = 'Figure 3: Number of conflicting and replicated results on split datasets') +
+         title = 'Figure A2.2: Number of conflicting and replicated results on split datasets') +
     theme_minimal() +
     theme(axis.title.x = element_blank(),
           axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1,
@@ -195,6 +220,6 @@ vlines <- tibble(x = .5 + seq(0, 26, 2), xend = x, y = 0.5, yend = 58.5)
           plot.title.position = 'plot')
 )
 
-ggsave(filename = paste0('fig_3_', date,'.png'),
+ggsave(filename = paste0('fig_A2.2_', date,'.png'),
        plot = pdh, width = 170, height = 180, dpi = 300, unit = 'mm',
        bg = 'white')
