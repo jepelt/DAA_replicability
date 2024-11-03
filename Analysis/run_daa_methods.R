@@ -43,35 +43,6 @@ run_aldex <- function(counts, meta, fm = ~ group, glm = T, gamma = NULL){
 }
 
 
-#ANCOM-BC2----------------------------------------------------------------------
-run_ancombc2 <- function(counts, meta, fm = ~ group, pc = 0){
-  physeq <- make_physeq(counts, meta)
-  fmc <- paste(as.character(fm)[-1], collapse = ' + ')
-  
-  obj <- try(ANCOMBC::ancombc2(data = physeq, fix_formula = fmc, pseudo = pc,
-                               lib_cut = 10, prv_cut = 0, verbose = F,
-                               pseudo_sens = F, tax_level = 'Species'))
-  
-  if(typeof(obj) != 'character'){
-    r <- obj$res
-    res <- tibble(taxon = r$taxon,
-                  est = r$lfc_groupcase,
-                  se = r$se_groupcase,
-                  df = nrow(counts) - length(all.vars(fm)) - 1,
-                  p = r$p_groupcase,
-                  method = paste0('ANCOM-BC2 (pc = ', pc, ')'))
-  }else{
-    res <- tibble(taxon = colnames(counts),
-                  est = NA,
-                  se = NA,
-                  df = NA,
-                  p = NA,
-                  method = paste0('ANCOM-BC2 (pc = ', pc, ')'))}
-  
-  return(res %>% mutate(data_id = meta$data_id[1]))
-}
-
-
 #corncob------------------------------------------------------------------------
 run_corncob <- function(counts, meta, fm = ~ group, ev = T){
   nvar <- length(all.vars(fm))
@@ -526,7 +497,6 @@ funs <- list(
   ~ run_aldex(.x, .y, glm = T),
   ~ run_aldex(.x, .y, glm = F),
   ~ run_aldex(.x, .y, glm = F, gamma = 0.5),
-  ~ run_ancombc2(.x, .y),
   ~ run_corncob(.x, .y, ev = F),
   ~ run_corncob(.x, .y, ev = T),
   ~ run_deseq(.x, .y),

@@ -43,35 +43,6 @@ run_aldex <- function(counts, meta, fm = ~ group, glm = T, gamma = NULL){
 }
 
 
-#ANCOM-BC2----------------------------------------------------------------------
-run_ancombc2 <- function(counts, meta, fm = ~ group, pc = 0){
-  physeq <- make_physeq(counts, meta)
-  fmc <- paste(as.character(fm)[-1], collapse = ' + ')
-  
-  obj <- try(ANCOMBC::ancombc2(data = physeq, fix_formula = fmc, pseudo = pc,
-                               lib_cut = 10, prv_cut = 0, verbose = F,
-                               pseudo_sens = F, tax_level = 'Species'))
-  
-  if(typeof(obj) != 'character'){
-    r <- obj$res
-    res <- tibble(taxon = r$taxon,
-                  est = r$lfc_groupcase,
-                  se = r$se_groupcase,
-                  df = nrow(counts) - length(all.vars(fm)) - 1,
-                  p = r$p_groupcase,
-                  method = paste0('ANCOM-BC2 (pc = ', pc, ')'))
-  }else{
-    res <- tibble(taxon = colnames(counts),
-                  est = NA,
-                  se = NA,
-                  df = NA,
-                  p = NA,
-                  method = paste0('ANCOM-BC2 (pc = ', pc, ')'))}
-  
-  return(res %>% mutate(data_id = meta$data_id[1]))
-}
-
-
 #corncob------------------------------------------------------------------------
 run_corncob <- function(counts, meta, fm = ~ group, ev = T){
   nvar <- length(all.vars(fm))
@@ -536,7 +507,6 @@ future::plan(future::multisession, workers = 7)
 
 funs <- list(
   ~ run_aldex(..1, ..2, ..3, glm = T),
-  ~ run_ancombc2(..1, ..2, ..3),
   ~ run_corncob(..1, ..2, ..3),
   ~ run_deseq(..1, ..2, ..3),
   ~ run_edger(..1, ..2, ..3),
