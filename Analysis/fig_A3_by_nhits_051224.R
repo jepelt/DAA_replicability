@@ -42,64 +42,68 @@ res_all <- bind_rows(res_list) %>%
 
 
 #Summarize results--------------------------------------------------------------
-condition <- 6000
+conditions <- c(1000, 2000, 4000, 6000)
+res_list <- list()
 
-lim_alpha <- res_all %>% 
-  mutate(q = ifelse(method == 'ANCOM-BC2', q20, q)) %>%
-  filter(analysis == 'half' & half == 1 & !is.na(q)) %>% 
-  group_by(method) %>%
-  arrange(q) %>%
-  slice(condition + 1) %>%
-  ungroup() %>% 
-  select(method, alpha = q)
-
-res_exploratory <- res_all %>% 
-  filter(analysis == 'half' & half == 1) %>% 
-  mutate(q = ifelse(method == 'ANCOM-BC2', q20, q)) %>%
-  left_join(., lim_alpha, by = 'method') %>% 
-  filter(q < alpha) %>% 
-  select(method, type, study, iter, taxon, est1 = est, q)
-
-res_validation <- res_all %>% 
-  filter(analysis == 'half' & half == 2) %>% 
-  mutate(is2 = T) %>% 
-  select(method, study, iter, taxon, is2, est2 = est, p)
-
-res_combined <- left_join(res_exploratory, res_validation,
-                          by = c('method', 'study', 'iter', 'taxon')) %>% 
-  filter(!is.na(is2)) %>% 
-  mutate(sgn1 = T,
-         d1 = ifelse(is.na(est1) | is.nan(est1), 0, sign(round(est1, 8))),
-         s1 = if_else(sgn1 & d1 != 0, T, F, F),
-         sgn2 = p < .05,
-         d2 = ifelse(is.na(est2) | is.nan(est2), 0, sign(round(est2, 8))),
-         s2 = if_else(sgn2 & d2 != 0, T, F, F),
-         nores = d2 == 0,
-         repl = s1 & s2 & d1 == d2,
-         same = s1 & !s2 & d1 == d2 & !nores,
-         opposite = s1 & !s2 & d1 != d2 & !nores,
-         anti = s1 & s2 & d1 != d2) %>%
-  mutate_if(is.logical, as.numeric) %>% 
-  mutate(check = repl + same + opposite + anti + nores) %>%
-  select(method, type, study, iter, taxon,
-         repl, same, opposite, anti, nores, check)
-
-stopifnot(all(res_combined$check == 1))
+for(i in 1:length(conditions)){
   
-hits <- res_exploratory %>% group_by(method) %>% summarize(r_nhit = n())
+  lim_alpha <- res_all %>% 
+    mutate(q = ifelse(method == 'ANCOM-BC2', q20, q)) %>%
+    filter(analysis == 'half' & half == 1 & !is.na(q)) %>% 
+    group_by(method) %>%
+    arrange(q) %>%
+    slice(conditions[i] + 1) %>%
+    ungroup() %>% 
+    select(method, alpha = q)
   
-res_summary <- res_combined %>% 
-  group_by(method) %>% 
-  summarize_at(vars(repl, same, opposite, anti, nores),
-               ~ sum(., na.rm = T)) %>% 
-  ungroup() %>% 
-  left_join(., hits, 'method') %>% 
-  mutate(n = repl + same + opposite + anti + nores,
-         r_confl = anti / n * 100,
-         r_repl = repl / n * 100,
-         condition = condition) %>% 
-  left_join(., lim_alpha, 'method') %>% 
-  select(condition, method, r_confl, r_repl, r_nhit, r_alpha = alpha)
+  res_exploratory <- res_all %>% 
+    filter(analysis == 'half' & half == 1) %>% 
+    mutate(q = ifelse(method == 'ANCOM-BC2', q20, q)) %>%
+    left_join(., lim_alpha, by = 'method') %>% 
+    filter(q < alpha) %>% 
+    select(method, type, study, iter, taxon, est1 = est, q)
+  
+  res_validation <- res_all %>% 
+    filter(analysis == 'half' & half == 2) %>% 
+    mutate(is2 = T) %>% 
+    select(method, study, iter, taxon, is2, est2 = est, p)
+  
+  res_combined <- left_join(res_exploratory, res_validation,
+                            by = c('method', 'study', 'iter', 'taxon')) %>% 
+    filter(!is.na(is2)) %>% 
+    mutate(sgn1 = T,
+           d1 = ifelse(is.na(est1) | is.nan(est1), 0, sign(round(est1, 8))),
+           s1 = if_else(sgn1 & d1 != 0, T, F, F),
+           sgn2 = p < .05,
+           d2 = ifelse(is.na(est2) | is.nan(est2), 0, sign(round(est2, 8))),
+           s2 = if_else(sgn2 & d2 != 0, T, F, F),
+           nores = d2 == 0,
+           repl = s1 & s2 & d1 == d2,
+           same = s1 & !s2 & d1 == d2 & !nores,
+           opposite = s1 & !s2 & d1 != d2 & !nores,
+           anti = s1 & s2 & d1 != d2) %>%
+    mutate_if(is.logical, as.numeric) %>% 
+    mutate(check = repl + same + opposite + anti + nores) %>%
+    select(method, type, study, iter, taxon,
+           repl, same, opposite, anti, nores, check)
+  
+  stopifnot(all(res_combined$check == 1))
+  
+  hits <- res_exploratory %>% group_by(method) %>% summarize(r_nhit = n())
+  
+  res_list[[i]] <- res_combined %>% 
+    group_by(method) %>% 
+    summarize_at(vars(repl, same, opposite, anti, nores),
+                 ~ sum(., na.rm = T)) %>% 
+    ungroup() %>% 
+    left_join(., hits, 'method') %>% 
+    mutate(n = repl + same + opposite + anti + nores,
+           r_confl = anti / n * 100,
+           r_repl = repl / n * 100,
+           condition = conditions[i]) %>% 
+    left_join(., lim_alpha, 'method') %>% 
+    select(condition, method, r_confl, r_repl, r_nhit, r_alpha = alpha)
+}
 
 
 #Create Figure------------------------------------------------------------------
@@ -108,7 +112,8 @@ round2 <- function(x, decimals = 2){
   format(round(x, decimals), nsmall = decimals)
 }
 
-res_figure <- bind_rows(res_summary) %>%
+res_figure <- bind_rows(res_list) %>%
+  group_by(condition) %>% 
   mutate(r_nhit = condition,
          s_confl = -as.numeric(scale(sqrt(r_confl))),
          s_repl = as.numeric(scale(r_repl)),
@@ -120,33 +125,38 @@ res_figure <- bind_rows(res_summary) %>%
   separate(name, into = c('type', 'var')) %>% 
   pivot_wider(names_from = type, values_from = value) %>% 
   mutate(name = factor(var,
-                       levels = c('confl','repl', 'alpha'),
-                       labels = c('Conflict%', 'Replication%', 'Nominal\nFDR level'))) %>% 
+                       levels = c('confl', 'repl', 'alpha'))) %>% 
   group_by(method) %>% 
   mutate(total = mean(s)) %>% 
   ungroup() %>% 
   mutate(method = fct_reorder(method, total),
-         res = case_when(var == 'alpha' ~ round2(r, 2),
+         res = case_when(var == 'alpha' ~ paste0(signif(r, 2)),
                          var == 'confl' ~ paste0(round2(r, 1), '%'),
                          T ~ paste0(round2(r, 0), '%')))
 
+xlabs <- rep(c('Conflict%', 'Replication%', 'Nominal\nFDR level'), 4)
+nhits <- paste0(c(1000, 2000, 4000, 6000), ' significant taxa\n(NHits = ',
+                c(1000, 2000, 4000, 6000),')')
 
-(p1 <- ggplot(res_figure, aes(name, method, fill = s)) +
+(p1 <- ggplot(res_figure, aes(interaction(name, condition), method, fill = s)) +
     geom_tile() + #linewidth = .1, color = 'grey40') +
-    geom_text(aes(label = res), color = 'grey20', size = 2.5, hjust = 0.55) +
-    geom_vline(xintercept = c(4.5, 8.5), color = 'white',
-               linewidth = 1) +
+    geom_text(aes(label = res), color = 'grey20', size = 2.3, hjust = 0.55) +
+    geom_vline(xintercept = c(3.5, 6.5, 9.5), color = 'grey20', linetype = '33',
+               linewidth = .5) +
+    annotate(geom = 'text', x = c(2, 5, 8, 11), y = 15.6,
+             vjust = 1, hjust = .5, color = 'grey0',
+             label = nhits, size = 2.5) +
     scale_fill_gradient2(low = "#f7AD19", mid = "white", high = "#70aed1",
                          midpoint = 0, na.value = 'white',
                          breaks = -2:1,
                          labels = c('-2 (Worse)', '-1', '0', '1 (Better)'),
                          name = 'Standardized\nvalue') +
-    scale_x_discrete(expand = c(0, 0), position = 'top') +
+    scale_x_discrete(expand = c(0, 0), labels = xlabs) +
     scale_y_discrete(expand = c(0, 0)) +
     #labs(title = 'Figure A3: Consistency on constant sensitivity\nin the split-data analyses (NHits = 6000)') +
     theme_minimal() +
     theme(axis.title.x = element_blank(),
-          axis.text.x =element_text(size = 7),
+          axis.text.x = element_text(size = 7, angle = -90, hjust = 0, vjust = 0.5),
           axis.title.y = element_blank(),
           axis.text.y = element_text(size = 7),
           legend.title = element_text(size = 8, color = 'grey0'),
@@ -159,6 +169,6 @@ res_figure <- bind_rows(res_summary) %>%
 )
 
 
-ggsave(filename = paste0('fig_A3_nhits_6000_', date,'.png'),
-       plot = p1, width = 100, height = 120, dpi = 300, unit = 'mm',
+ggsave(filename = paste0('fig_A3_by_nhits_', date,'.png'),
+       plot = p1, width = 170, height = 130, dpi = 300, unit = 'mm',
        bg = 'white')
