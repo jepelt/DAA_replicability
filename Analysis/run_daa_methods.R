@@ -487,7 +487,7 @@ run_zicoseq <- function(counts, meta, fm = ~ group, version = 'Default'){
 load('data_171023.rds')
 
 set.seed(1)
-datasets <- d_all
+datasets <- d_all[sample(1:651)] #To have the same seed as originally
 lcounts <- map(datasets, ~ .$counts)
 lmeta <- map(datasets, ~ .$meta)
 
@@ -496,7 +496,6 @@ future::plan(future::multisession, workers = 7)
 funs <- list(
   ~ run_aldex(.x, .y, glm = T),
   ~ run_aldex(.x, .y, glm = F),
-  ~ run_aldex(.x, .y, glm = F, gamma = 0.5),
   ~ run_corncob(.x, .y, ev = F),
   ~ run_corncob(.x, .y, ev = T),
   ~ run_deseq(.x, .y),
@@ -509,9 +508,7 @@ funs <- list(
   ~ run_nb(.x, .y),
   ~ run_orm(.x, .y, norm = 'TSS'),
   ~ run_orm(.x, .y, norm = 'GMPR'),
-  ~ run_orm(.x, .y, norm = 'Wrench'),
-  ~ run_rademu(.x, .y),
-  ~ run_zicoseq(.x, .y)
+  ~ run_orm(.x, .y, norm = 'Wrench')
 )
 
 resl <- list()
@@ -544,7 +541,39 @@ for(i in 1:length(datasets)){
   res_maaslin5[[i]] <- run_maaslin2(counts, meta, norm = 'TMM')
 }
 
-res_list <- c(resl, res_ldm1, res_ldm2, res_maaslin1, res_maaslin2, 
-              res_maaslin3, res_maaslin4, res_maaslin5)
+
+res_logr <- furrr::future_map2(lcounts, lmeta, ~ run_logr_firth(.x, .y),
+                               .options = furrr::furrr_options(seed = 1),
+                               .progress = T)
+
+
+#Order of datasets not randomly permuted (to have the correct seed)
+datasets2 <- d_all
+lcounts2 <- map(datasets2, ~ .$counts)
+lmeta2 <- map(datasets2, ~ .$meta)
+
+funs2 <- list(
+  ~ run_aldex(.x, .y, glm = F, gamma = 0.5),
+  ~ run_rademu(.x, .y),
+  ~ run_zicoseq(.x, .y)
+)
+
+resl2 <- list()
+Sys.time()
+for(k in 1:length(funs2)){
+  rs <- NULL
+  try(rs <- furrr::future_map2(lcounts2, lmeta2, funs2[[k]],
+                               .options = furrr::furrr_options(seed = 1),
+                               .progress = T))
+  
+  resl2[[k]] <- rs 
+  print(k)
+  print(Sys.time())
+}
+
+
+res_list <- c(resl, resl2, res_ldm1, res_ldm2, res_maaslin1, res_maaslin2, 
+              res_maaslin3, res_maaslin4, res_maaslin5, res_logr)
+
 
 #save(res_list, file = 'res_main.rds')
